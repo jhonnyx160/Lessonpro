@@ -9,16 +9,25 @@
     #chat { border: 1px solid #ccc; height: 300px; overflow-y: scroll; padding: 10px; margin-bottom: 10px; }
     #vocab, #stats { border: 1px solid #ccc; padding: 10px; margin-top: 20px; }
     button { padding: 10px 20px; font-size: 16px; margin: 5px; }
-    #nicknameInput { margin-bottom: 15px; }
+    #nicknameInput, #apiKeyBlock { margin-bottom: 15px; }
   </style>
 </head>
 <body>
   <h2>🤖 LessonPro - AI English Tutor</h2>
+
+  <div id="apiKeyBlock">
+    <label for="apiKey">OpenAI API Key:</label>
+    <input type="password" id="apiKey" placeholder="Paste your API Key here" style="width:60%">
+    <button onclick="saveApiKey()">💾 Save Key</button>
+    <button onclick="clearApiKey()">❌ Clear Key</button>
+  </div>
+
   <div id="nicknameInput">
     <label for="nickname">Enter your nickname:</label>
     <input type="text" id="nickname" placeholder="Your name" />
     <button onclick="startSession()">Start</button>
   </div>
+
   <div id="session" style="display:none;">
     <div id="chat"></div>
     <button onclick="startListening()">🎙️ Speak</button>
@@ -32,7 +41,22 @@
   </div>
 
   <script>
-    let apiKey = prompt("Enter your OpenAI API Key:");
+    let apiKey = localStorage.getItem("apiKey") || "";
+    if (apiKey) document.getElementById("apiKey").value = apiKey;
+
+    function saveApiKey() {
+      apiKey = document.getElementById("apiKey").value.trim();
+      localStorage.setItem("apiKey", apiKey);
+      alert("API Key saved!");
+    }
+
+    function clearApiKey() {
+      localStorage.removeItem("apiKey");
+      apiKey = "";
+      document.getElementById("apiKey").value = "";
+      alert("API Key cleared!");
+    }
+
     let nickname = "";
     let startTime = null;
     let wordCount = 0;
@@ -46,7 +70,9 @@
     function startSession() {
       nickname = document.getElementById("nickname").value.trim();
       if (!nickname) return alert("Please enter a name.");
+      if (!apiKey) return alert("Please enter and save your OpenAI API Key first.");
       document.getElementById("nicknameInput").style.display = "none";
+      document.getElementById("apiKeyBlock").style.display = "none";
       document.getElementById("session").style.display = "block";
       startTime = new Date();
       updateVocab();
