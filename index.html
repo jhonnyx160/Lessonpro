@@ -1,0 +1,151 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>LessonPro - AI English Tutor</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 700px; margin: auto; padding: 20px; }
+    #chat { border: 1px solid #ccc; height: 300px; overflow-y: scroll; padding: 10px; margin-bottom: 10px; }
+    #vocab, #stats { border: 1px solid #ccc; padding: 10px; margin-top: 20px; }
+    button { padding: 10px 20px; font-size: 16px; margin: 5px; }
+    #nicknameInput { margin-bottom: 15px; }
+  </style>
+</head>
+<body>
+  <h2>🤖 LessonPro - AI English Tutor</h2>
+  <div id="nicknameInput">
+    <label for="nickname">Enter your nickname:</label>
+    <input type="text" id="nickname" placeholder="Your name" />
+    <button onclick="startSession()">Start</button>
+  </div>
+  <div id="session" style="display:none;">
+    <div id="chat"></div>
+    <button onclick="startListening()">🎙️ Speak</button>
+    <button onclick="endLesson()">❌ End Lesson</button>
+
+    <h3>📚 Your Vocabulary</h3>
+    <div id="vocab"></div>
+
+    <h3>📈 Таблица успехов</h3>
+    <div id="stats"></div>
+  </div>
+
+  <script>
+    let apiKey = prompt("Enter your OpenAI API Key:");
+    let nickname = "";
+    let startTime = null;
+    let wordCount = 0;
+    let vocab = JSON.parse(localStorage.getItem("vocab") || "{}");
+    let stats = JSON.parse(localStorage.getItem("stats") || "[]");
+
+    const chat = document.getElementById("chat");
+    const vocabDiv = document.getElementById("vocab");
+    const statsDiv = document.getElementById("stats");
+
+    function startSession() {
+      nickname = document.getElementById("nickname").value.trim();
+      if (!nickname) return alert("Please enter a name.");
+      document.getElementById("nicknameInput").style.display = "none";
+      document.getElementById("session").style.display = "block";
+      startTime = new Date();
+      updateVocab();
+      updateStats();
+    }
+
+    function addToChat(role, text) {
+      chat.innerHTML += `<b>${role}:</b> ${text}<br>`;
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    function startListening() {
+      let recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+      recognition.lang = 'en-US';
+      recognition.start();
+      recognition.onresult = function(event) {
+        let text = event.results[0][0].transcript;
+        addToChat("You", text);
+        sendToGPT(text);
+      };
+    }
+
+    async function sendToGPT(text) {
+      addToChat("AI", "Thinking...");
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + apiKey
+        },
+        body: JSON.stringify({
+          model: "gpt-3.5-turbo",
+          messages: [
+            { role: "system", content: "You are an English tutor. Keep conversation friendly. After a few exchanges, end the lesson with a rating (1–5), estimate user's English level (beginner/intermediate/advanced), and say goodbye." },
+            { role: "user", content: text }
+          ]
+        })
+      });
+      const data = await response.json();
+      let answer = data.choices[0].message.content;
+      addToChat("AI", answer);
+      speak(answer);
+      extractAndSaveVocab(answer);
+    }
+
+    function speak(text) {
+      let synth = window.speechSynthesis;
+      let voices = synth.getVoices().filter(v => v.lang.includes('en'));
+      let randomVoice = voices[Math.floor(Math.random() * voices.length)];
+      let utter = new SpeechSynthesisUtterance(text);
+      utter.voice = randomVoice;
+      synth.speak(utter);
+    }
+
+    function extractAndSaveVocab(answer) {
+      let match = answer.match(/\*\*(.*?)\*\*: (.*?)(\.|$)/);
+      if (match) {
+        let word = match[1].trim();
+        let translation = match[2].trim();
+        vocab[word] = translation;
+        wordCount++;
+        localStorage.setItem("vocab", JSON.stringify(vocab));
+        updateVocab();
+      }
+    }
+
+    function updateVocab() {
+      vocabDiv.innerHTML = "";
+      for (let word in vocab) {
+        vocabDiv.innerHTML += `<b>${word}</b>: ${vocab[word]}<br>`;
+      }
+    }
+
+    function endLesson() {
+      const endTime = new Date();
+      const minutes = Math.round((endTime - startTime) / 60000);
+      const aiRating = Math.floor(Math.random() * 2 + 4);
+      const level = wordCount > 10 ? "Intermediate" : "Beginner";
+      const result = {
+        nickname: nickname,
+        words: wordCount,
+        time: minutes,
+        rating: aiRating,
+        level: level,
+        date: new Date().toLocaleString()
+      };
+      stats.push(result);
+      localStorage.setItem("stats", JSON.stringify(stats));
+      updateStats();
+      alert(`Lesson ended. Rating: ${aiRating}/5. Level: ${level}`);
+    }
+
+    function updateStats() {
+      statsDiv.innerHTML = "<table border='1' cellpadding='5'><tr><th>Ник</th><th>Слов</th><th>Минут</th><th>Оценка</th><th>Уровень</th><th>Дата</th></tr>";
+      stats.forEach(s => {
+        statsDiv.innerHTML += `<tr><td>${s.nickname}</td><td>${s.words}</td><td>${s.time}</td><td>${s.rating}</td><td>${s.level}</td><td>${s.date}</td></tr>`;
+      });
+      statsDiv.innerHTML += "</table>";
+    }
+  </script>
+</body>
+</html>
